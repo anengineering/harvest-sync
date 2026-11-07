@@ -1,0 +1,16 @@
+# Runs harvest-sync on the schedule in deploy/crontab. See "Running it on a server with Docker" in the
+# README. Run Compose on the server, or on your own computer with a Docker context pointed at the
+# server. Either way it reads .env from this folder and passes the tokens to the container.
+
+services:
+    harvest-sync:
+        build: .
+        container_name: harvest-sync
+        env_file:
+            - .env
+        logging:
+            driver: json-file
+            options:
+                max-size: 10m
+                max-file: "3"
+        restart: unless-stopped

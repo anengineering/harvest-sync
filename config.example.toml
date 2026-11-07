@@ -1,0 +1,65 @@
+# harvest-sync configuration. Copy this file to config.toml (git ignores it) and fill it in.
+# Access tokens don't go here: set HARVEST_SOURCE_TOKEN and HARVEST_DEST_TOKEN in the
+# environment, or in a .env file next to this one (see .env.example).
+
+# Sent to Harvest in the User-Agent header, which Harvest requires.
+contact_email = "you@example.com"
+
+# Your time zone. "Today" and week boundaries are worked out in it, so a server
+# running on UTC behaves the same as your laptop.
+timezone = "America/Los_Angeles"
+
+[source]                    # your own Harvest account
+account_id = 1234567        # shown when you create the token at id.getharvest.com/developers
+client = "Client Co"        # the client in your account whose time is synced (name or ID)
+
+[destination]               # the client's Harvest account
+account_id = 7654321
+
+# Each run covers the current month so far; `sync --to 2026-11-30` covers all of November.
+[sync]
+earliest_date = 2026-11-01  # nothing dated before this is ever synced
+propagate_deletes = true    # delete their copy when you delete an entry
+max_deletes_per_run = 10    # if one run would delete more than this, it deletes nothing and says so
+# For tracking taxable income in each location. If your task names start with where the work was
+# done, such as CA-DEV or CA-OAK-DEV, set this to true and the location goes in front of every note
+# sent to the client: "Reviewed schematics" on CA-DEV becomes "CA-Reviewed schematics".
+location_prefix = false
+
+[submit]
+enabled = false             # must be true before `submit --apply` will submit anything
+week_starts_on = "monday"   # match the week start in their Harvest
+
+# Optional: email the result of scheduled runs through Mailgun. Leave this out for no email at all.
+# Your Mailgun API key goes in .env as HARVEST_MAILGUN_API_KEY, never here. `harvest-sync test-email`
+# tries these settings.
+# [email]
+# to = "you@example.com"             # or a list
+# from = "harvest-sync@mail.example.com"
+# mailgun_domain = "mail.example.com"  # your sending domain in Mailgun
+# mailgun_region = "us"              # or "eu", if that's where the domain was created
+# send_every_run = true              # for a test period; set to false once you trust the sync
+# send_on_problems = true            # email a failed run or anything marked !!, whatever send_every_run says
+
+# Which of your projects go to which of theirs. Use names or project codes; `from` can be a list.
+# harvest-sync manages all of your entries in each `to` project in their Harvest, so don't type
+# time into those projects there directly: it would be overwritten or deleted as a stray copy.
+[[project_map]]
+from = "Your project name"
+to   = "Their project name"
+
+# Which of your tasks go to which of theirs; `from` can be a list.
+# default_note is what a blank note becomes; a rule without one uses TBD. If this client doesn't
+# need a note on every entry, set require_note = false instead, and blank notes stay blank.
+# With location_prefix on, a task name with a "-" that isn't a location, such as Non-Billable,
+# needs location_prefix = false in its own rule.
+# `harvest-sync check` shows what blank notes become.
+[[task_map]]
+from         = ["Development", "Testing"]
+to           = "Engineering"
+default_note = "Engineering work"
+
+[[task_map]]
+from         = "Travel"
+to           = "Travel"
+default_note = "Traveling"

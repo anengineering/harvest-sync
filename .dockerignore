@@ -1,0 +1,10 @@
+# An allow-list, so that .env (your tokens) can never reach the image.
+*
+!pyproject.toml
+!uv.lock
+!README.md
+!LICENSE
+!src/
+**/__pycache__
+!config.toml
+!deploy/crontab

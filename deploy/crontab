@@ -1,0 +1,10 @@
+# The schedule for the Docker container. A change here needs `docker compose up -d --build`.
+# CRON_TZ is the time zone these times are in.
+CRON_TZ=America/Los_Angeles
+
+# Copy your time to their Harvest every evening. --email does nothing without an [email] section.
+30 23 * * * harvest-sync sync --apply --email
+
+# Submit last week for approval every Monday morning. To use this, remove the # and also set
+# enabled = true under [submit] in config.toml.
+# 15 7 * * 1 harvest-sync submit --apply --email
