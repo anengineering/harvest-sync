@@ -32,6 +32,16 @@ def test_everything_the_dockerfile_copies_is_allowed_into_the_build():
     assert set(copied) <= set(allowed())
 
 
+def test_every_image_a_build_leaves_can_be_pruned_by_the_readmes_command():
+    label = "org.opencontainers.image.title=harvest-sync"
+    dockerfile = lines("Dockerfile")
+    stages = [i for i, line in enumerate(dockerfile) if line.startswith("FROM ")]
+    assert len(stages) == 2
+    for start in stages:  # the label comes straight after FROM, so every image in the stage has it
+        assert dockerfile[start + 1] == f"LABEL {label}"
+    assert f"docker image prune -f --filter label={label}" in (ROOT / "README.md").read_text(encoding="utf-8")
+
+
 def test_the_scheduled_commands_are_valid():
     jobs = [line.lstrip("# ") for line in lines("deploy/crontab") if re.match(r"#?\s*[\d*]", line)]
     assert len(jobs) == 2  # the sync, and the submit that's commented out

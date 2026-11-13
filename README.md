@@ -154,6 +154,7 @@ The image is built with your `config.toml` and `deploy/crontab` inside it, so do
 - **Logs and failures:** `docker compose logs harvest-sync` shows each run's report. A run that needs attention exits with `1`, and that's logged too. To hear about problems without reading the logs, set up [email reports](#email-reports).
 - **Missed runs aren't made up.** If the server is down at 23:30, that night's sync doesn't happen. The next run covers the month so far, so this only matters on a month's last day. Before you invoice, run `sync --to` that last day by hand.
 - **Updating:** get the new code in this folder, then run `docker compose up -d --build`.
+- **Disk space:** logs are capped at 30 MB (three files of 10 MB, set in `docker-compose.yml`). Each rebuild leaves the previous version's images behind, about 150 MB a time, so after a rebuild remove them with `docker image prune -f --filter label=org.opencontainers.image.title=harvest-sync`. That only removes unused harvest-sync images; images from anything else on the server are left alone. The next rebuild then takes a minute longer, because it starts without the old images to reuse.
 
 Schedule it on one machine only. You can still run it by hand on any machine; matching by content prevents duplicates. But two runs at the same moment could race.
 

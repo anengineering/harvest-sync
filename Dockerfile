@@ -2,8 +2,12 @@
 # needs `docker compose up -d --build`. Your tokens are never in the image: .dockerignore keeps .env
 # out, and Compose passes them in when the container starts. The image does hold config.toml, with
 # your account IDs and client names, so don't push it to a public registry.
+#
+# Each stage carries the same label, so that the images a rebuild leaves behind can be removed without
+# touching anyone else's: docker image prune -f --filter label=org.opencontainers.image.title=harvest-sync
 
 FROM python:3.13-slim AS build
+LABEL org.opencontainers.image.title=harvest-sync
 ENV UV_PYTHON_DOWNLOADS=never
 RUN pip install --no-cache-dir uv==0.12.1
 
@@ -27,6 +31,7 @@ COPY src ./src
 RUN uv sync --frozen --no-dev --no-editable
 
 FROM python:3.13-slim
+LABEL org.opencontainers.image.title=harvest-sync
 COPY --from=build /usr/local/bin/supercronic /usr/local/bin/supercronic
 COPY --from=build /app/.venv /app/.venv
 COPY config.toml deploy/crontab /config/
