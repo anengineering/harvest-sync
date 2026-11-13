@@ -1,6 +1,6 @@
 [project]
 name = "harvest-sync"
-version = "0.1.0"
+version = "0.1.1"
 description = "One-way sync of time entries from your Harvest account to a client's Harvest account"
 readme = "README.md"
 license = "MIT"
