@@ -122,6 +122,10 @@ def test_sync_previews_then_applies(config_file, sides, capsys):
     assert "changes applied" in out and "Both sides match." in out
     assert [e["notes"] for e in dest.entries.values()] == ["CA-Reviewed schematics"]
 
+    assert run(config_file, "sync", *window, "--apply") == cli.EXIT_OK
+    out = capsys.readouterr().out
+    assert "2026-11-14: no changes made" in out and "Summary: 1 unchanged. Both sides match." in out
+
 
 def test_sync_with_problems_exits_1(config_file, sides, capsys):
     sides[0].entries = {1: source_entry(1, task="ADMIN")}

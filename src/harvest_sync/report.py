@@ -22,7 +22,12 @@ NOTE_WIDTH = 60
 
 
 def sync_report(result: SyncResult) -> str:
-    mode = "changes applied" if result.applied else "preview only, nothing written (add --apply to make these changes)"
+    if not result.applied:
+        mode = "preview only, nothing written (add --apply to make these changes)"
+    elif any(a.kind in CHANGES and not a.error for a in result.actions):
+        mode = "changes applied"
+    else:  # nothing needed changing, or every change failed or was held
+        mode = "no changes made"
     lines = [f"Sync {result.start} to {result.end}: {mode}"]
     lines += [f"   -- {note}" for note in result.notes]
 

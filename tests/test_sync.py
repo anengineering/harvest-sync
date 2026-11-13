@@ -169,6 +169,7 @@ def test_failed_writes_are_reported_and_the_rest_still_run():
     result = sync(source, dest)
     assert [bool(a.error) for a in result.actions] == [True, True]
     assert result.needs_attention
+    assert ": no changes made" in sync_report(result)
 
 
 def test_start_and_end_times_on_your_side_are_copied_as_hours():
