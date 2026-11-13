@@ -160,6 +160,7 @@ def test_your_entries_outside_the_mapped_projects_are_left_alone_and_flagged():
     assert 60 in dest.entries
     assert result.totals["2026-11-03"].differs  # 1 h of yours against 2 h on their side
     assert result.needs_attention
+    assert '!! 2026-11-03 Tue  Project 950  DEV  1.00 h  "typed in by hand"' in sync_report(result)
 
 
 def test_failed_writes_are_reported_and_the_rest_still_run():
@@ -225,23 +226,23 @@ def test_summary_says_what_was_done_only_after_applying():
 
 def test_action_lines_say_what_was_done_only_after_applying():
     source, dest = sides([source_entry(1)])
-    assert '   create    2026-11-03  CA-DEV -> DEV  1.00 h  "CA-EE"' in sync_report(sync(source, dest, apply=False))
-    assert '   created   2026-11-03  CA-DEV -> DEV  1.00 h  "CA-EE"' in sync_report(sync(source, dest))
+    assert '   create    2026-11-03 Tue  CA-DEV -> DEV  1.00 h  "CA-EE"' in sync_report(sync(source, dest, apply=False))
+    assert '   created   2026-11-03 Tue  CA-DEV -> DEV  1.00 h  "CA-EE"' in sync_report(sync(source, dest))
 
     source, dest = sides([source_entry(1, task="ADMIN")])
-    assert "!! skipped   2026-11-03  your entry 1" in sync_report(sync(source, dest))
+    assert "!! skipped   2026-11-03 Tue  your entry 1" in sync_report(sync(source, dest))
 
 
 def test_report_totals_the_period():
     source, dest = sides([source_entry(1, hours=1.5), source_entry(2, "2026-11-04", hours=2.25)])
     text = sync_report(sync(source, dest))
     assert (
-        "\nDay          Yours  Theirs\n"
-        "----------  ------  ------\n"
-        "2026-11-03    1.50    1.50\n"
-        "2026-11-04    2.25    2.25\n"
-        "----------  ------  ------\n"
-        "Total         3.75    3.75\n"
+        "\nDate        Day   Yours  Theirs\n"
+        "----------  ---  ------  ------\n"
+        "2026-11-03  Tue    1.50    1.50\n"
+        "2026-11-04  Wed    2.25    2.25\n"
+        "----------  ---  ------  ------\n"
+        "Total              3.75    3.75\n"
     ) in text
 
 
@@ -249,26 +250,26 @@ def test_report_totals_a_single_day_too():
     source, dest = sides([source_entry(1, hours=1.5)])
     text = sync_report(sync(source, dest, apply=False))
     assert (
-        "\nDay          Yours  Theirs now  Theirs after\n"
-        "----------  ------  ----------  ------------\n"
-        "2026-11-03    1.50        0.00          1.50\n"
-        "----------  ------  ----------  ------------\n"
-        "Total         1.50        0.00          1.50\n"
+        "\nDate        Day   Yours  Theirs now  Theirs after\n"
+        "----------  ---  ------  ----------  ------------\n"
+        "2026-11-03  Tue    1.50        0.00          1.50\n"
+        "----------  ---  ------  ----------  ------------\n"
+        "Total              1.50        0.00          1.50\n"
     ) in text
 
 
 def test_only_the_days_that_differ_are_flagged_in_the_table():
     source, dest = sides([source_entry(1)], [dest_entry(60, project_id=950)])
     text = sync_report(sync(source, dest))
-    assert "2026-11-03    1.00    2.00  !! differs\n" in text
-    assert "Total         1.00    2.00\n" in text
+    assert "2026-11-03  Tue    1.00    2.00  !! differs\n" in text
+    assert "Total              1.00    2.00\n" in text
 
 
 def test_preview_report():
     source, dest = sides([source_entry(1, notes="Reviewed schematics"), source_entry(2, task="ADMIN")])
     text = sync_report(sync(source, dest, apply=False))
     assert "preview only" in text
-    assert '   create    2026-11-03  CA-DEV -> DEV  1.00 h  "CA-Reviewed schematics"' in text
-    assert '!! skip      2026-11-03  your entry 2' in text
-    assert 'your task "ADMIN" isn\'t in task_map' in text
+    assert '   create    2026-11-03 Tue  CA-DEV -> DEV  1.00 h  "CA-Reviewed schematics"' in text
+    # A reason goes on the next line, lined up under the entry's details.
+    assert '!! skip      2026-11-03 Tue  your entry 2\n' + " " * 29 + 'your task "ADMIN" isn\'t in task_map' in text
     assert "need attention" in text

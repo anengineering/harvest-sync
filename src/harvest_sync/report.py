@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from datetime import date
 
 from harvest_sync.reconcile import Action
 from harvest_sync.submit import SubmitResult
@@ -12,7 +13,9 @@ KINDS = ("create", "update", "delete", "unchanged", "skip", "conflict", "held", 
 APPLIED_LABELS = {"create": "created", "update": "updated", "delete": "deleted", "skip": "skipped"}
 PREVIEW_LABELS = {"create": "to create", "update": "to update", "delete": "to delete", "skip": "to skip"}
 TOTAL_FIELDS = ("yours", "theirs_before", "theirs_after")
-DAY_WIDTH = 10
+DATE_WIDTH = 10
+WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")  # not strftime, so the locale can't change them
+LABEL_WIDTH = DATE_WIDTH + 2 + 3  # a row's label spans the Date and Day columns
 APPLIED_COLUMNS = (("Yours", "yours", 6), ("Theirs", "theirs_after", 6))  # title, DayTotal field, width
 PREVIEW_COLUMNS = (("Yours", "yours", 6), ("Theirs now", "theirs_before", 10), ("Theirs after", "theirs_after", 12))
 NOTE_WIDTH = 60
@@ -40,7 +43,7 @@ def sync_report(result: SyncResult) -> str:
         lines.append("Your entries in their Harvest outside the mapped projects (left alone):")
         for e in result.unmanaged:
             lines.append(
-                f"!! {e['spent_date']}  {e['project']['name']}  {e['task']['name']}  {_hours(e.get('hours'))}  {_note(e.get('notes'))}"
+                f"!! {e['spent_date']} {_weekday(e['spent_date'])}  {e['project']['name']}  {e['task']['name']}  {_hours(e.get('hours'))}  {_note(e.get('notes'))}"
             )
 
     if result.totals:
@@ -79,15 +82,15 @@ def submit_report(result: SubmitResult) -> str:
 def _totals_table(result: SyncResult) -> list[str]:
     columns = APPLIED_COLUMNS if result.applied else PREVIEW_COLUMNS
 
-    def row(day: str, total: DayTotal) -> str:
-        return f"{day:<{DAY_WIDTH}}" + "".join(f"  {getattr(total, name):{width}.2f}" for _, name, width in columns)
+    def row(label: str, total: DayTotal) -> str:
+        return f"{label:<{LABEL_WIDTH}}" + "".join(f"  {getattr(total, name):{width}.2f}" for _, name, width in columns)
 
-    heading = f"{'Day':<{DAY_WIDTH}}" + "".join(f"  {title:>{width}}" for title, _, width in columns)
-    rule = "-" * DAY_WIDTH + "".join("  " + "-" * width for _, _, width in columns)
+    heading = f"{'Date':<{DATE_WIDTH}}  Day" + "".join(f"  {title:>{width}}" for title, _, width in columns)
+    rule = "-" * DATE_WIDTH + "  ---" + "".join("  " + "-" * width for _, _, width in columns)
     days = sorted(result.totals.items())
     # The whole period, to check against your invoice; always shown so it's always in the same place.
     total = DayTotal(*(round(sum(getattr(t, f) for _, t in days), 2) for f in TOTAL_FIELDS))
-    rows = [row(day, t) + ("  !! differs" if t.differs else "") for day, t in days]
+    rows = [row(f"{day}  {_weekday(day)}", t) + ("  !! differs" if t.differs else "") for day, t in days]
     return [heading, rule, *rows, rule, row("Total", total)]
 
 
@@ -114,11 +117,19 @@ def _action_line(a: Action, applied: bool) -> str:
         detail = f"their {a.dest['task']['name']}  {_hours(a.dest.get('hours'))}  {_note(a.dest.get('notes'))}"
     else:
         detail = f"your entry {a.source_id}"
-    line = f"{flag} {kind:<9} {a.day:<10}  {detail}"
+    prefix = f"{flag} {kind:<9} {a.day:<10} {_weekday(a.day):<3}  "
+    line = prefix + detail
     for extra in (a.reason, a.warning, a.error):
         if extra:
-            line += f"\n{'':25}{extra}"
+            line += "\n" + " " * len(prefix) + extra
     return line
+
+
+def _weekday(day: str) -> str:
+    try:
+        return WEEKDAYS[date.fromisoformat(day).weekday()]
+    except ValueError:
+        return ""
 
 
 def _hours(hours: float | None) -> str:
