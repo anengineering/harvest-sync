@@ -90,13 +90,34 @@ def _totals_table(result: SyncResult) -> list[str]:
     def row(label: str, total: DayTotal) -> str:
         return f"{label:<{LABEL_WIDTH}}" + "".join(f"  {getattr(total, name):{width}.2f}" for _, name, width in columns)
 
-    heading = f"{'Date':<{DATE_WIDTH}}  Day" + "".join(f"  {title:>{width}}" for title, _, width in columns)
-    rule = "-" * DATE_WIDTH + "  ---" + "".join("  " + "-" * width for _, _, width in columns)
-    days = sorted(result.totals.items())
+    def sum_of(totals: list[DayTotal]) -> DayTotal:
+        return DayTotal(*(round(sum(getattr(t, f) for t in totals), 2) for f in TOTAL_FIELDS))
+
+    def rule(char: str) -> str:
+        return char * DATE_WIDTH + "  " + char * 3 + "".join("  " + char * width for _, _, width in columns)
+
+    heading = [
+        f"{'Date':<{DATE_WIDTH}}  Day" + "".join(f"  {title:>{width}}" for title, _, width in columns),
+        rule("="),
+    ]
+    weeks: dict[tuple[int, int, int], list[tuple[str, DayTotal]]] = {}
+    for day, t in sorted(result.totals.items()):
+        d = date.fromisoformat(day)
+        weeks.setdefault((d.year, d.month, week_of_month(d, result.week_starts_on)), []).append((day, t))
+    lines = []
+    for (_, _, number), days in weeks.items():  # each week is a table of its own
+        lines += heading
+        lines += [row(f"{day}  {_weekday(day)}", t) + ("  !! differs" if t.differs else "") for day, t in days]
+        lines += [rule("-"), row(f"Week {number}", sum_of([t for _, t in days])), ""]
     # The whole period, to check against your invoice; always shown so it's always in the same place.
-    total = DayTotal(*(round(sum(getattr(t, f) for _, t in days), 2) for f in TOTAL_FIELDS))
-    rows = [row(f"{day}  {_weekday(day)}", t) + ("  !! differs" if t.differs else "") for day, t in days]
-    return [heading, rule, *rows, rule, row("Total", total)]
+    lines += [*heading, row("Total", sum_of(list(result.totals.values())))]
+    return lines
+
+
+def week_of_month(day: date, week_starts_on: int) -> int:
+    """Which week of its month a day is in: week 1 holds the 1st, and each later week starts on week_starts_on."""
+    days_before_the_1st = (day.replace(day=1).weekday() - week_starts_on) % 7  # week 1's days in the previous month
+    return (day.day - 1 + days_before_the_1st) // 7 + 1
 
 
 def _action_line(a: Action, applied: bool) -> str:

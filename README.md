@@ -131,7 +131,7 @@ Every command's output starts with `harvest-sync` and its version. `uv run harve
 | `submit [--week-of DATE] [--apply] [--email]` | Syncs a finished week, then submits it for approval. Defaults to last week. |
 | `test-email` | Sends a test email through Mailgun using the `[email]` settings. |
 
-`sync` ends with each day's hours on both sides and a total for the whole period, which is handy to check against an invoice. Days with no hours on either side aren't listed.
+`sync` ends with each day's hours on both sides, a subtotal for each week of the month, and a total for the whole period, which is handy to check against an invoice. Days with no hours on either side aren't listed. Week 1 is the week the 1st falls in, and weeks start on the day set in your own Harvest's settings (Monday if harvest-sync can't read it), so they match your Harvest's week view.
 
 Exit codes: `0` means both sides match, or in a preview that they will once applied. `1` means something needs attention (the lines marked `!!`). `2` means it couldn't run (config, token or network problem).
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
-from harvest_sync.config import Config
+from harvest_sync.config import WEEKDAYS, Config
 from harvest_sync.harvest import AuthError, HarvestClient, HarvestError, OutcomeUnknown
 from harvest_sync.mapping import Mapper, hours_of
 from harvest_sync.reconcile import Action, create_payload, plan, update_payload
@@ -40,6 +40,7 @@ class SyncResult:
     notes: list[str] = field(default_factory=list)
     running_timers: int = 0  # your timers still running in the window
     unsettled: int = 0  # changes a re-plan still wanted after applying
+    week_starts_on: int = 0  # the week start in your Harvest, for the report's weekly subtotals; 0 = Monday
 
     @property
     def attention_count(self) -> int:
@@ -75,6 +76,7 @@ class Syncer:
         self.dest = dest
         self.source_user = source.me()["id"]
         self.dest_user = dest.me()["id"]
+        self.week_starts_on = _week_start(source.company())
         company = dest.company()
         if company and company.get("wants_timestamp_timers"):
             raise SyncError("their account tracks start and end times; harvest-sync can only copy to an account that tracks durations")
@@ -87,7 +89,7 @@ class Syncer:
         )
         dest_entries = self.dest.time_entries(user_id=self.dest_user, start=start, end=end)
         copies, unmanaged = self._split(dest_entries)
-        result = SyncResult(start, end, apply, unmanaged=unmanaged)
+        result = SyncResult(start, end, apply, unmanaged=unmanaged, week_starts_on=self.week_starts_on)
         result.running_timers = sum(1 for e in source_entries if e.get("is_running"))
         result.actions = plan(source_entries, copies, self.mapper)
         self._limit_deletes(result.actions)
@@ -138,6 +140,12 @@ class Syncer:
             action.error = f"{e}; unclear whether it was created, so the next run checks before creating it again"
         except HarvestError as e:
             action.error = str(e)
+
+def _week_start(company: dict | None) -> int:
+    """The weekday your Harvest's weeks start on, as in date.weekday(); Monday if it can't be read."""
+    day = str((company or {}).get("week_start_day") or "").lower()
+    return WEEKDAYS.index(day) if day in WEEKDAYS else 0
+
 
 def _totals(
     start: date,

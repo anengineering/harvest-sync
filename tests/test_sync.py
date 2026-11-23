@@ -7,7 +7,7 @@ from fakes import FakeHarvest
 from harvest_sync.config import TaskRule
 from harvest_sync.harvest import Unprocessable
 from harvest_sync.reconcile import NO_MATCH
-from harvest_sync.report import sync_report
+from harvest_sync.report import sync_report, week_of_month
 from harvest_sync.sync import SyncError, Syncer, sync_window
 
 START, END = date(2026, 11, 1), date(2026, 11, 14)
@@ -239,10 +239,14 @@ def test_report_totals_the_period():
     text = sync_report(sync(source, dest))
     assert (
         "\nDate        Day   Yours  Theirs\n"
-        "----------  ---  ------  ------\n"
+        "==========  ===  ======  ======\n"
         "2026-11-03  Tue    1.50    1.50\n"
         "2026-11-04  Wed    2.25    2.25\n"
         "----------  ---  ------  ------\n"
+        "Week 2             3.75    3.75\n"
+        "\n"
+        "Date        Day   Yours  Theirs\n"
+        "==========  ===  ======  ======\n"
         "Total              3.75    3.75\n"
     ) in text
 
@@ -252,17 +256,84 @@ def test_report_totals_a_single_day_too():
     text = sync_report(sync(source, dest, apply=False))
     assert (
         "\nDate        Day   Yours  Theirs now  Theirs after\n"
-        "----------  ---  ------  ----------  ------------\n"
+        "==========  ===  ======  ==========  ============\n"
         "2026-11-03  Tue    1.50        0.00          1.50\n"
         "----------  ---  ------  ----------  ------------\n"
+        "Week 2             1.50        0.00          1.50\n"
+        "\n"
+        "Date        Day   Yours  Theirs now  Theirs after\n"
+        "==========  ===  ======  ==========  ============\n"
         "Total              1.50        0.00          1.50\n"
     ) in text
+
+
+def test_report_subtotals_each_week_of_the_month():
+    entries = [
+        source_entry(1, "2026-11-01", hours=2),  # a Sunday, so on its own in week 1 of a week starting Monday
+        source_entry(2, "2026-11-03", hours=1.5),
+        source_entry(3, "2026-11-04", hours=2.25),
+        source_entry(4, "2026-11-09", hours=1),
+    ]
+    source, dest = sides(entries)
+    text = sync_report(sync(source, dest))
+    heading = "Date        Day   Yours  Theirs\n==========  ===  ======  ======\n"  # repeated for each week
+    assert (
+        f"\n{heading}"
+        "2026-11-01  Sun    2.00    2.00\n"
+        "----------  ---  ------  ------\n"
+        "Week 1             2.00    2.00\n"
+        "\n"
+        f"{heading}"
+        "2026-11-03  Tue    1.50    1.50\n"
+        "2026-11-04  Wed    2.25    2.25\n"
+        "----------  ---  ------  ------\n"
+        "Week 2             3.75    3.75\n"
+        "\n"
+        f"{heading}"
+        "2026-11-09  Mon    1.00    1.00\n"
+        "----------  ---  ------  ------\n"
+        "Week 3             1.00    1.00\n"
+        "\n"
+        f"{heading}"
+        "Total              6.75    6.75\n"
+    ) in text
+
+
+def test_weeks_start_on_the_day_set_in_your_harvest():
+    entries = [source_entry(1, "2026-11-01"), source_entry(2, "2026-11-07"), source_entry(3, "2026-11-08")]
+    source, dest = sides(entries)
+    source.company_settings = {"week_start_day": "Sunday"}
+    text = sync_report(sync(source, dest))
+    assert "Week 1             2.00    2.00\n" in text  # Sunday the 1st to Saturday the 7th
+    assert "Week 2             1.00    1.00\n" in text
+    assert "Week 3" not in text
+
+
+@pytest.mark.parametrize(
+    ("day", "starts_on", "week"),
+    [
+        (date(2026, 11, 1), 0, 1),  # November 2026 starts on a Sunday
+        (date(2026, 11, 2), 0, 2),
+        (date(2026, 11, 8), 0, 2),
+        (date(2026, 11, 30), 0, 6),
+        (date(2026, 11, 7), 6, 1),  # weeks starting Sunday
+        (date(2026, 11, 8), 6, 2),
+        (date(2026, 11, 6), 5, 1),  # weeks starting Saturday
+        (date(2026, 11, 7), 5, 2),
+        (date(2026, 6, 1), 0, 1),  # June 2026 starts on a Monday
+        (date(2026, 6, 7), 0, 1),
+        (date(2026, 6, 8), 0, 2),
+    ],
+)
+def test_week_of_month(day, starts_on, week):
+    assert week_of_month(day, starts_on) == week
 
 
 def test_only_the_days_that_differ_are_flagged_in_the_table():
     source, dest = sides([source_entry(1)], [dest_entry(60, project_id=950)])
     text = sync_report(sync(source, dest))
     assert "2026-11-03  Tue    1.00    2.00  !! differs\n" in text
+    assert "Week 2             1.00    2.00\n" in text
     assert "Total              1.00    2.00\n" in text
 
 
